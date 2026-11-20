@@ -15,7 +15,7 @@
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-app.ts';
 
@@ -23,6 +23,17 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 const MAX_SCREENSHOT_BYTES = 262144;
 const MAX_SCREENSHOTS = 4;
+
+// Refuse an output directory inside this repository: a hand-in run once
+// wrote out/ next to the sources and it was committed by mistake. The
+// output belongs outside the snapshot (or in /output in the grader).
+{
+  const outAbs = resolve(here, out);
+  const rootAbs = resolve(here);
+  if (outAbs === rootAbs || outAbs.startsWith(rootAbs + sep)) {
+    throw new Error(`MAKEFUN_OUTPUT_DIR must be outside the repository, not ${out}`);
+  }
+}
 
 // Refuse an oversize screenshot before anything is copied: the scorer caps
 // every screenshot at 256 KiB, so a bigger file would fail the gate outright.
@@ -60,6 +71,13 @@ const dossier = buildDossier(out, {
 });
 
 // Refuse a zero-byte dossier: an empty judge summary is a broken hand-in.
+// Also refuse a dossier that is not well-formed JSON: buildDossier's output
+// must parse before it is handed in.
 if (!dossier || dossier.length === 0) throw new Error('dossier is empty, refusing to hand in');
+try {
+  JSON.parse(dossier);
+} catch {
+  throw new Error('dossier is not well-formed JSON, refusing to hand in');
+}
 writeFileSync(join(out, 'dossier.json'), dossier);
 console.log(`VICE CUT handed in: ${dossier.length} bytes of dossier, ${readdirSync(join(out, 'screenshots')).length} screenshots`);
