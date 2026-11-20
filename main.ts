@@ -71,11 +71,12 @@ const dossier = buildDossier(out, {
 });
 
 // Refuse a zero-byte dossier: an empty judge summary is a broken hand-in.
-// Also refuse a dossier that is not well-formed JSON: buildDossier's output
-// must parse before it is handed in.
+// Also refuse a dossier that is not well-formed JSON: buildDossier returns
+// bytes, so decode them first (parsing the raw bytes would read them as a
+// comma list, not JSON) and parse the text before handing it in.
 if (!dossier || dossier.length === 0) throw new Error('dossier is empty, refusing to hand in');
 try {
-  JSON.parse(dossier);
+  JSON.parse(new TextDecoder('utf-8').decode(dossier));
 } catch {
   throw new Error('dossier is not well-formed JSON, refusing to hand in');
 }
